@@ -15,8 +15,7 @@ int updateDecoder(timeDecoder* decoder, int input)
 {
     int rVal;
 
-    switch(decoder->currentState)
-    {
+    switch(decoder->currentState) {
         case waitForHigh:
             rVal = funcWaitForHigh(decoder, input);
             break;
@@ -138,11 +137,9 @@ int funcCountLow(timeDecoder* decoder, int input)
 
 int funcCountHigh(timeDecoder* decoder, int input)
 {
-    int inputCount = decoder->inputCount;
-
     /* check if there is not too many or too few ones */
-    int over  = inputCount >= NSAMPLES + NSPADDING &&  input;
-    int under = inputCount <  NSAMPLES - NSPADDING && !input;
+    int over  = decoder->inputCount >= NSAMPLES + NSPADDING &&  input;
+    int under = decoder->inputCount <  NSAMPLES - NSPADDING && !input;
 
     /* reset decoder if there are too many or not enough 1 samples */
     if (over || under) {
@@ -168,11 +165,9 @@ int funcCountHigh(timeDecoder* decoder, int input)
 
         case 2:    /* valid bit, but haven't found start of frame */
             initDecoder(decoder);
+            updateInputBuffer(decoder, input);
             decoder->currentState = countLow;
             return err;
-
-        default:
-            break;
     }
 
     /* go to bufferFull state if bitBuffer is now full */
