@@ -10,7 +10,7 @@ void initDecoder(timeDecoder* decoder)
 }
 
 
-int updateDecoder(timeDecoder* decoder, short input)
+int updateDecoder(timeDecoder* decoder, int input)
 {
     int rVal;
 
@@ -41,7 +41,7 @@ int updateDecoder(timeDecoder* decoder, short input)
 }
 
 
-void updateInputBuffer(timeDecoder* decoder, short input)
+void updateInputBuffer(timeDecoder* decoder, int input)
 {
     /* update inputCount and inputBuffer */
     (decoder->inputBuffer)[decoder->inputCount++] = input;
@@ -50,18 +50,18 @@ void updateInputBuffer(timeDecoder* decoder, short input)
 
 int updateBitBuffer(timeDecoder* decoder)
 {
-    short zeroCounts = 0;
+    int zeroCounts = 0;
 
-    short* inputBuffer = decoder->inputBuffer;
+    char* inputBuffer = decoder->inputBuffer;
 
     /* Count number of zeroes */
     for (int i = 0; i < decoder->inputCount; i++)
         if (!inputBuffer[i]) zeroCounts++;
 
     /* number or zero samples encode the bit */
-    short marker = 4 * NSAMPLES / 5;
-    short zero   =     NSAMPLES / 5;
-    short one    =     NSAMPLES / 2;
+    int marker = 4 * NSAMPLES / 5;
+    int zero   =     NSAMPLES / 5;
+    int one    =     NSAMPLES / 2;
 
     char bit;
 
@@ -74,7 +74,7 @@ int updateBitBuffer(timeDecoder* decoder)
     else
         return 1;
 
-    short bitCount  = decoder->bitCount;
+    int   bitCount  = decoder->bitCount;
     char* bitBuffer = decoder->bitBuffer;
 
     /* if empty bitBuffer or start of frame has been found, append bit */
@@ -93,7 +93,7 @@ int updateBitBuffer(timeDecoder* decoder)
 }
 
 
-int funcWaitForHigh(timeDecoder* decoder, short input)
+int funcWaitForHigh(timeDecoder* decoder, int input)
 {
     /* detected high raw input */
     if (input)
@@ -103,7 +103,7 @@ int funcWaitForHigh(timeDecoder* decoder, short input)
 }
 
 
-int funcWaitForEdge(timeDecoder* decoder, short input)
+int funcWaitForEdge(timeDecoder* decoder, int input)
 {
     /* detected falling edge */
     if (!input) {
@@ -115,7 +115,7 @@ int funcWaitForEdge(timeDecoder* decoder, short input)
 }
 
 
-int funcCountLow(timeDecoder* decoder, short input)
+int funcCountLow(timeDecoder* decoder, int input)
 {
     /* reset decoder if there are too many 0 samples */
     if (decoder->inputCount >= NSAMPLES) {
@@ -134,13 +134,13 @@ int funcCountLow(timeDecoder* decoder, short input)
 }
 
 
-int funcCountHigh(timeDecoder* decoder, short input)
+int funcCountHigh(timeDecoder* decoder, int input)
 {
-    short inputCount = decoder->inputCount;
+    int inputCount = decoder->inputCount;
 
     /* check if there is not too many or too few ones */
-    short over  = inputCount >= NSAMPLES + NSPADDING &&  input;
-    short under = inputCount <  NSAMPLES - NSPADDING && !input;
+    int over  = inputCount >= NSAMPLES + NSPADDING &&  input;
+    int under = inputCount <  NSAMPLES - NSPADDING && !input;
 
     /* reset decoder if there are too many or not enough 1 samples */
     if (over || under) {
@@ -201,13 +201,13 @@ int decodeFrame(char* bitBuffer, struct tm* currentTime)
 int decodeTime(char* bitBuffer, struct tm* currentTime)
 {
     /* calculate hour and minute */
-    short minute = bitBuffer[1] * 40 + bitBuffer[2] * 20
-                 + bitBuffer[3] * 10 + bitBuffer[5] * 8
-                 + bitBuffer[6] * 4  + bitBuffer[7] * 2  + bitBuffer[8];
+    int minute = bitBuffer[1] * 40 + bitBuffer[2] * 20
+               + bitBuffer[3] * 10 + bitBuffer[5] * 8
+               + bitBuffer[6] * 4  + bitBuffer[7] * 2  + bitBuffer[8];
 
-    short hour   = bitBuffer[12] * 20 + bitBuffer[13] * 10
-                 + bitBuffer[15] *  8 + bitBuffer[16] * 4
-                 + bitBuffer[17] *  2 + bitBuffer[18];
+    int hour   = bitBuffer[12] * 20 + bitBuffer[13] * 10
+               + bitBuffer[15] *  8 + bitBuffer[16] * 4
+               + bitBuffer[17] *  2 + bitBuffer[18];
 
     /* check that encoded hour and minutes are valid */
     if (minute > 59 || hour > 23)
@@ -224,21 +224,21 @@ int decodeTime(char* bitBuffer, struct tm* currentTime)
 int decodeDate(char* bitBuffer, struct tm* currentTime)
 {
     /* calculate day of year and current year */
-    short day  = bitBuffer[22] * 200 + bitBuffer[23] * 100
-               + bitBuffer[25] * 80  + bitBuffer[26] * 40
-               + bitBuffer[27] * 20  + bitBuffer[28] * 10
-               + bitBuffer[30] * 8   + bitBuffer[31] * 4
-               + bitBuffer[32] * 2   + bitBuffer[33];
+    int day  = bitBuffer[22] * 200 + bitBuffer[23] * 100
+             + bitBuffer[25] * 80  + bitBuffer[26] * 40
+             + bitBuffer[27] * 20  + bitBuffer[28] * 10
+             + bitBuffer[30] * 8   + bitBuffer[31] * 4
+             + bitBuffer[32] * 2   + bitBuffer[33];
 
-    short year = bitBuffer[45] * 80 + bitBuffer[46] * 40
-               + bitBuffer[47] * 20 + bitBuffer[48] * 10
-               + bitBuffer[50] * 8  + bitBuffer[51] * 4
-               + bitBuffer[52] * 2  + bitBuffer[53] + 2000;
+    int year = bitBuffer[45] * 80 + bitBuffer[46] * 40
+             + bitBuffer[47] * 20 + bitBuffer[48] * 10
+             + bitBuffer[50] * 8  + bitBuffer[51] * 4
+             + bitBuffer[52] * 2  + bitBuffer[53] + 2000;
 
-    short dst  = bitBuffer[57] && bitBuffer[58];
+    int dst  = bitBuffer[57] && bitBuffer[58];
 
     /* check if it's a leap year */
-    short leapYear;
+    int leapYear;
     if (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))
         leapYear = 1;
 
@@ -246,10 +246,10 @@ int decodeDate(char* bitBuffer, struct tm* currentTime)
     if (day > 365 + leapYear || leapYear != bitBuffer[55])
         return 1;
 
-    short daysInMonth[12] = {31, 28 + leapYear, 31, 30, 31, 30,
-                             31, 31,            30, 31, 30, 31};
-    short month    = 0;
-    short daysUsed = 0;
+    int daysInMonth[12] = {31, 28 + leapYear, 31, 30, 31, 30,
+                           31, 31,            30, 31, 30, 31};
+    int month    = 0;
+    int daysUsed = 0;
 
     /* calculate current month */
     while (day > daysUsed) {
@@ -257,7 +257,7 @@ int decodeDate(char* bitBuffer, struct tm* currentTime)
     }
 
     /* calculate day of the month */
-    short dayOfMonth = daysInMonth[month - 1] - (daysUsed - day);
+    int dayOfMonth = daysInMonth[month - 1] - (daysUsed - day);
 
     /* update current date */
     currentTime->tm_year  = year;

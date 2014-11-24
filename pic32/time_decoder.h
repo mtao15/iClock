@@ -19,7 +19,7 @@ enum STATE {
 /* Stores received signals from receiver board */
 typedef struct {
     /* stores raw input from receiver board */
-    short inputBuffer[NSAMPLES + NSPADDING];
+    char inputBuffer[NSAMPLES + NSPADDING];
 
     /* stores bits encoded in the transmission */
     char bitBuffer[BUFFERSIZE];
@@ -27,9 +27,9 @@ typedef struct {
     /* current state of the timeDecoder state machine */
     enum STATE currentState;
 
-    short foundStart;    /* have seen two consecutive marker bits */
-    short bitCount;     /* number of encoded bits stored in bitBuffer */
-    short inputCount;    /* number of raw input samples in inputBuffer */
+    int foundStart;   /* have seen two consecutive marker bits */
+    int bitCount;     /* number of encoded bits stored in bitBuffer */
+    int inputCount;   /* number of raw input samples in inputBuffer */
 
 } timeDecoder;
 
@@ -54,7 +54,7 @@ void initDecoder(timeDecoder* decoder);
  *        has been reset.
  *     2: Buffer storing encoded bits is full, ready for decoding.
  */
-int updateDecoder(timeDecoder* decoder, short input);
+int updateDecoder(timeDecoder* decoder, int input);
 
 
 /*
@@ -76,7 +76,7 @@ int updateTimeAndDate(timeDecoder* decoder, time_t* currentTime);
  * \param decoder Pointer to the timeDecoder to update.
  * \param input Raw input sample from receiver board.
  */
-void updateInputBuffer(timeDecoder* decoder, short input);
+void updateInputBuffer(timeDecoder* decoder, int input);
 
 
 /*
@@ -92,16 +92,16 @@ void updateInputBuffer(timeDecoder* decoder, short input);
 int updateBitBuffer(timeDecoder* decoder);
 
 
-int funcWaitForHigh(timeDecoder* decoder, short input);
+int funcWaitForHigh(timeDecoder* decoder, int input);
 
 
-int funcWaitForEdge(timeDecoder* decoder, short input);
+int funcWaitForEdge(timeDecoder* decoder, int input);
 
 
-int funcCountLow(timeDecoder* decoder, short input);
+int funcCountLow(timeDecoder* decoder, int input);
 
 
-int funcCountHigh(timeDecoder* decoder, short input);
+int funcCountHigh(timeDecoder* decoder, int input);
 
 
 /*
