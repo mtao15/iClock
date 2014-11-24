@@ -32,25 +32,36 @@ void printState(timeDecoder* decoder)
 int main()
 {
     timeDecoder decoder;
-    initTimeDecoder(&decoder);
+    initDecoder(&decoder);
 
     char c = getchar();
 
     while (c != '\n' && c != '\r' && c != EOF) {
         short input = (short) (c - '0');
 
-        updateTimeDecoder(&decoder, input);
-//        printState(&decoder);
+        updateDecoder(&decoder, input);
         c = getchar();
     }
 
 
-    for (int i = 0; i < decoder.bitsCount; i++)
+    for (int i = 0; i < decoder.bitCount; i++)
     {
-        printf("%c", decoder.bitsBuffer[i]);
+        char c;
+        switch (decoder.bitBuffer[i]){
+            case 0:
+                c = '0';
+                break;
+            case 1:
+                c = '1';
+                break;
+            default:
+                c = 'm';
+        }
+        printf("%c", c);
     }
 
     printf("\n");
 
     return 0;
 }
+
