@@ -1,4 +1,5 @@
 #include "time_decoder.h"
+#include <stdio.h>
 
 void initDecoder(timeDecoder* decoder)
 {
@@ -33,7 +34,7 @@ int updateDecoder(timeDecoder* decoder, int input)
             break;
 
         default:
-            rVal = 2;
+            rVal = 3;
             break;
     }
 
@@ -74,11 +75,12 @@ int updateBitBuffer(timeDecoder* decoder)
     else
         return 1;
 
+
     int   bitCount  = decoder->bitCount;
     char* bitBuffer = decoder->bitBuffer;
 
-    /* if empty bitBuffer or start of frame has been found, append bit */
-    if (bitCount == 0 || decoder->foundStart) {
+    /* if empty bitBuffer and marker, or frame star found, append bit */
+    if ((bitCount == 0 && bit == 'm') || decoder->foundStart) {
         bitBuffer[decoder->bitCount++] = bit;
         return 0;
     }
@@ -89,7 +91,7 @@ int updateBitBuffer(timeDecoder* decoder)
         return 0;
     }
 
-    return 1;
+    return 2;
 }
 
 
@@ -157,16 +159,26 @@ int funcCountHigh(timeDecoder* decoder, int input)
     /* if input is 0, decode bit from inputBuffer and update bitBuffer */
     int err = updateBitBuffer(decoder);
 
-    /* inputBuffer does not encode a valid bit */
-    if (err) {
-        initDecoder(decoder);
-        return 1;
+    /* check for error conditions */
+    switch (err) {
+
+        case 1:    /* inputBuffer does not encode a valid bit */
+            initDecoder(decoder);
+            return err;
+
+        case 2:    /* valid bit, but haven't found start of frame */
+            initDecoder(decoder);
+            decoder->currentState = countLow;
+            return err;
+
+        default:
+            break;
     }
 
     /* go to bufferFull state if bitBuffer is now full */
     if (decoder->bitCount >= BUFFERSIZE) {
         decoder->currentState = bufferFull;
-        return 2;
+        return 3;
     }
 
     /* start counting 0's again */
@@ -248,6 +260,8 @@ int decodeDate(char* bitBuffer, struct tm* currentTime)
 
     int daysInMonth[12] = {31, 28 + leapYear, 31, 30, 31, 30,
                            31, 31,            30, 31, 30, 31};
+
+    /* 0 to 11 inclusive for month, convention of tm struct */
     int month    = 0;
     int daysUsed = 0;
 
@@ -257,10 +271,10 @@ int decodeDate(char* bitBuffer, struct tm* currentTime)
     }
 
     /* calculate day of the month */
-    int dayOfMonth = daysInMonth[month - 1] - (daysUsed - day);
+    int dayOfMonth = daysInMonth[--month] - (daysUsed - day);
 
     /* update current date */
-    currentTime->tm_year  = year;
+    currentTime->tm_year  = year - 1900;    /* convention of tm struct */
     currentTime->tm_mon   = month;
     currentTime->tm_mday  = dayOfMonth;
     currentTime->tm_isdst = dst;

@@ -52,7 +52,8 @@ void initDecoder(timeDecoder* decoder);
  *     0: No errors detected yet in signal.
  *     1: Error detected in time signal and timeDecoder state machine
  *        has been reset.
- *     2: Buffer storing encoded bits is full, ready for decoding.
+ *     2: Signal valid so far, but have not found start of frame.
+ *     3: Buffer storing encoded bits is full, ready for decoding.
  */
 int updateDecoder(timeDecoder* decoder, int input);
 
@@ -88,6 +89,7 @@ void updateInputBuffer(timeDecoder* decoder, int input);
  * \returns
  *     0: Input buffer decoded successfully.
  *     1: Input buffer is not a valid encoding.
+ *     2: Input buffer is valid but can be discarded.
  */
 int updateBitBuffer(timeDecoder* decoder);
 
