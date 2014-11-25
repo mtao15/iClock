@@ -1,5 +1,4 @@
 #include "time_decoder.h"
-#include <stdio.h>
 
 void initDecoder(timeDecoder* decoder)
 {
@@ -38,6 +37,49 @@ int updateDecoder(timeDecoder* decoder, int input)
     }
 
     return rVal;
+}
+
+
+int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime)
+{
+    char* frame1 = decoder->bitBuffer;
+    char* frame2 = decoder->bitBuffer + 60;
+
+    struct tm frame1Time, frame2Time;
+
+    /* decode the 2 frames and check for errors */
+    if (decodeFrame(frame1, &frame1Time) || decodeFrame(frame2, &frame2Time))
+        return 1;
+
+    /* daylight saving times don't match */
+    if (frame1Time.tm_isdst != frame2Time.tm_isdst)
+        return 1;
+
+    /* remove and store dst flag */
+    int dst = frame2Time.tm_isdst;
+    frame1Time.tm_isdst = frame2Time.tm_isdst = -1;
+
+    /* convert to unix time */
+    time_t unixTime1 = mktime(&frame1Time);
+    time_t unixTime2 = mktime(&frame2Time);
+
+    /* check for time conversion errors */
+    if (unixTime1 == -1 || unixTime2 == -1)
+        return 1;
+
+    /* check that the two frames differ by 60 seconds */
+    if (unixTime2 - unixTime1 != 60)
+        return 1;
+
+    /* 60 seconds has passed since the second frame */
+    time_t currentUnixTime = unixTime2 + 60;
+    struct tm* utcTime     = localtime(&currentUnixTime);
+
+    /* add dst flag */
+    *currentTime = *utcTime;
+    currentTime->tm_isdst = dst;
+
+    return 0;
 }
 
 
@@ -185,73 +227,74 @@ int funcCountHigh(timeDecoder* decoder, int input)
 }
 
 
-int decodeFrame(char* bitBuffer, struct tm* currentTime)
+int decodeFrame(char* frame, struct tm* frameTime)
 {
-    int err;
-
-    err = checkFrame(bitBuffer);
-    if (err)
+    /* check position of marker and predefined 0 bits */
+    if (checkFrame(frame))
         return 1;
 
-    err = decodeTime(bitBuffer, currentTime);
-    if (err)
+
+    /* decode time and check for errors */
+    if (decodeTime(frame, frameTime))
         return 1;
 
-    err = decodeDate(bitBuffer, currentTime);
-    if (err)
+
+    /* decode date and check for errors */
+    if (decodeDate(frame, frameTime))
         return 1;
 
     return 0;
 }
 
 
-int decodeTime(char* bitBuffer, struct tm* currentTime)
+int decodeTime(char* frame, struct tm* frameTime)
 {
     /* calculate hour and minute */
-    int minute = bitBuffer[1] * 40 + bitBuffer[2] * 20
-               + bitBuffer[3] * 10 + bitBuffer[5] * 8
-               + bitBuffer[6] * 4  + bitBuffer[7] * 2  + bitBuffer[8];
+    int minute = frame[1] * 40 + frame[2] * 20
+               + frame[3] * 10 + frame[5] * 8
+               + frame[6] * 4  + frame[7] * 2  + frame[8];
 
-    int hour   = bitBuffer[12] * 20 + bitBuffer[13] * 10
-               + bitBuffer[15] *  8 + bitBuffer[16] * 4
-               + bitBuffer[17] *  2 + bitBuffer[18];
+    int hour   = frame[12] * 20 + frame[13] * 10
+               + frame[15] *  8 + frame[16] * 4
+               + frame[17] *  2 + frame[18];
 
     /* check that encoded hour and minutes are valid */
     if (minute > 59 || hour > 23)
         return 1;
 
-    currentTime->tm_sec  = 0;
-    currentTime->tm_min  = minute;
-    currentTime->tm_hour = hour;
+    frameTime->tm_sec  = 0;
+    frameTime->tm_min  = minute;
+    frameTime->tm_hour = hour;
 
     return 0;
 }
 
 
-int decodeDate(char* bitBuffer, struct tm* currentTime)
+int decodeDate(char* frame, struct tm* frameTime)
 {
     /* calculate day of year and current year */
-    int day  = bitBuffer[22] * 200 + bitBuffer[23] * 100
-             + bitBuffer[25] * 80  + bitBuffer[26] * 40
-             + bitBuffer[27] * 20  + bitBuffer[28] * 10
-             + bitBuffer[30] * 8   + bitBuffer[31] * 4
-             + bitBuffer[32] * 2   + bitBuffer[33];
+    int day  = frame[22] * 200 + frame[23] * 100
+             + frame[25] * 80  + frame[26] * 40
+             + frame[27] * 20  + frame[28] * 10
+             + frame[30] * 8   + frame[31] * 4
+             + frame[32] * 2   + frame[33];
 
-    int year = bitBuffer[45] * 80 + bitBuffer[46] * 40
-             + bitBuffer[47] * 20 + bitBuffer[48] * 10
-             + bitBuffer[50] * 8  + bitBuffer[51] * 4
-             + bitBuffer[52] * 2  + bitBuffer[53] + 2000;
+    int year = frame[45] * 80 + frame[46] * 40
+             + frame[47] * 20 + frame[48] * 10
+             + frame[50] * 8  + frame[51] * 4
+             + frame[52] * 2  + frame[53] + 2000;
 
-    int dst  = bitBuffer[57] && bitBuffer[58];
+    int dst  = frame[57] && frame[58];
 
     /* check if it's a leap year */
-    int leapYear;
+    int leapYear = 0;
     if (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0))
         leapYear = 1;
 
     /* check that the encoded day is valid and leap year matches up */
-    if (day > 365 + leapYear || leapYear != bitBuffer[55])
+    if (day > 365 + leapYear || leapYear != frame[55])
         return 1;
+
 
     int daysInMonth[12] = {31, 28 + leapYear, 31, 30, 31, 30,
                            31, 31,            30, 31, 30, 31};
@@ -261,32 +304,31 @@ int decodeDate(char* bitBuffer, struct tm* currentTime)
     int daysUsed = 0;
 
     /* calculate current month */
-    while (day > daysUsed) {
+    while (day > daysUsed)
         daysUsed += daysInMonth[month++];
-    }
 
     /* calculate day of the month */
     int dayOfMonth = daysInMonth[--month] - (daysUsed - day);
 
     /* update current date */
-    currentTime->tm_year  = year - 1900;    /* convention of tm struct */
-    currentTime->tm_mon   = month;
-    currentTime->tm_mday  = dayOfMonth;
-    currentTime->tm_isdst = dst;
+    frameTime->tm_year  = year - 1900;    /* convention of tm struct */
+    frameTime->tm_mon   = month;
+    frameTime->tm_mday  = dayOfMonth;
+    frameTime->tm_isdst = dst;
 
     return 0;
 }
 
 
-int checkFrame(char* bitBuffer)
+int checkFrame(char* frame)
 {
     int valid =
-        bitBuffer[0]  == 'm' && bitBuffer[4]  ==  0  && bitBuffer[9]  == 'm' &&
-        bitBuffer[10] ==  0  && bitBuffer[11] ==  0  && bitBuffer[14] ==  0  &&
-        bitBuffer[19] == 'm' && bitBuffer[20] ==  0  && bitBuffer[21] ==  0  &&
-        bitBuffer[24] ==  0  && bitBuffer[29] == 'm' && bitBuffer[34] ==  0  &&
-        bitBuffer[35] ==  0  && bitBuffer[39] == 'm' && bitBuffer[44] ==  0  &&
-        bitBuffer[49] == 'm' && bitBuffer[54] ==  0  && bitBuffer[59] == 'm';
+        frame[0]  == 'm' && frame[4]  ==  0  && frame[9]  == 'm' &&
+        frame[10] ==  0  && frame[11] ==  0  && frame[14] ==  0  &&
+        frame[19] == 'm' && frame[20] ==  0  && frame[21] ==  0  &&
+        frame[24] ==  0  && frame[29] == 'm' && frame[34] ==  0  &&
+        frame[35] ==  0  && frame[39] == 'm' && frame[44] ==  0  &&
+        frame[49] == 'm' && frame[54] ==  0  && frame[59] == 'm';
 
     /* follow convention of returning 0 for success */
     return !valid;

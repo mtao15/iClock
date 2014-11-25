@@ -62,13 +62,13 @@ int updateDecoder(timeDecoder* decoder, int input);
  * \brief Decode received transmission frames and get the current time and date.
  *
  * \param decoder Pointer to timeDecoder.
- * \param updatedTime Stores the current time and date if decoding is successful.
+ * \param currentTime Stores the current time and date if decoding is successful.
  *
  * \returns
  *     0: Time signal is successfully decoded
  *     1: Error(s) in time signal.
  */
-int updateTimeAndDate(timeDecoder* decoder, time_t* currentTime);
+int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime);
 
 
 /*
@@ -109,52 +109,52 @@ int funcCountHigh(timeDecoder* decoder, int input);
 /*
  * \brief Decode the time and date from one complete frame of transmission.
  *
- * \param bitBuffer Pointer to array storing one full frame.
- * \param updatedTime Stores the current time and date.
+ * \param frame Pointer to array storing one full frame.
+ * \param frameTime Stores the current time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
  *     1: Error(s) in time signal.
  */
-int decodeFrame(char* bitBuffer, struct tm* currentTime);
+int decodeFrame(char* frame, struct tm* frameTime);
 
 
 /*
  * \brief Decode only the time from one complete frame of transmission.
  *
- * \param bitBuffer Pointer to array storing one full frame.
- * \param updatedTime Stores the current time and date.
+ * \param frame Pointer to array storing one full frame.
+ * \param frameTime Stores the current time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
  *     1: Error(s) in time signal.
  */
-int decodeTime(char* bitBuffer, struct tm* currentTime);
+int decodeTime(char* frame, struct tm* frameTime);
 
 
 /*
  * \brief Decode only the date from one complete frame of transmission.
  *
- * \param bitBuffer Pointer to array storing one full frame.
- * \param updatedTime Stores the current time and date.
+ * \param frame Pointer to array storing one full frame.
+ * \param frameTime Stores the current time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
  *     1: Error(s) in time signal.
  */
-int decodeDate(char* bitBuffer, struct tm* currentTime);
+int decodeDate(char* frame, struct tm* frameTime);
 
 
 /*
  * \brief Check that predefined 0 and marker bits are in the right position.
  *
- * \param bitBuffer Pointer to array storing one full frame.
+ * \param frame Pointer to array storing one full frame.
  *
  * \returns
  *     0: Predefined bits are in the correct position.
  *     1: Invalid frame.
  */
-int checkFrame(char* bitBuffer);
+int checkFrame(char* frame);
 
 
 #endif /* DECODER_H_ */
