@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "time_decoder.h"
 
@@ -29,39 +28,60 @@ void printState(timeDecoder* decoder)
     }
 }
 
+int testFullTransmission(timeDecoder* decoder)
+{
+    char c = getchar();
+
+    if (c == EOF)
+        return -1;
+
+    int bufferFull = 0;
+
+    while (1) {
+        if (c == EOF)
+            return -1;
+
+        char input = (short) (c - '0');
+        bufferFull = updateDecoder(decoder, input);
+
+        if (bufferFull == 3)
+            break;
+
+        c = getchar();
+    }
+
+    struct tm currentTime;
+
+    int err = updateTimeAndDate(decoder, &currentTime);
+    initDecoder(decoder);
+
+    if(err) {
+        printf("Err: valid bits but encoding is invalid.\n");
+        return 1;
+    }
+
+    /* if successful, keep first marker and keep going */
+    decoder->currentState = countLow;
+    decoder->bitCount = 1;
+    updateInputBuffer(decoder, 0);
+
+    int year = 1900 + currentTime.tm_year;
+    int month = currentTime.tm_mon + 1;
+    int day = currentTime.tm_mday;
+    int hour = currentTime.tm_hour;
+    int minute = currentTime.tm_min;
+
+    printf("%d-%02d-%02d %02d:%02d\n", year, month, day, hour, minute);
+
+    return 0;
+}
+
 int main()
 {
     timeDecoder decoder;
     initDecoder(&decoder);
 
-    char c = getchar();
-
-    while (c != '\n' && c != '\r' && c != EOF) {
-        short input = (short) (c - '0');
-
-        updateDecoder(&decoder, input);
-        c = getchar();
-    }
-
-
-    for (int i = 0; i < decoder.bitCount; i++)
-    {
-        char c;
-        switch (decoder.bitBuffer[i]){
-            case 0:
-                c = '0';
-                break;
-            case 1:
-                c = '1';
-                break;
-            default:
-                c = 'm';
-        }
-        printf("%c", c);
-    }
-
-    printf("\n");
-
+    while (testFullTransmission(&decoder) != -1);
     return 0;
 }
 
