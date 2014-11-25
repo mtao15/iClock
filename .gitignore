@@ -28,7 +28,29 @@
 *.x86_64
 *.hex
 
-
+# Mplab
+*.mcs
+*.mcw
+*.d
+*.pre
+*.p1
+*.lst
+*.sym
+*.sdb
+*.obj.dmp
+html/
+nbproject/private/
+nbproject/Package-*.bash
+build/
+nbbuild/
+dist/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+funclist
+nbproject/Makefile-*
+disassembly/
+*.map
 
 # ignore hdl source files in top level directory
 *.vhd
@@ -72,3 +94,7 @@ simulation/
 timing/
 testbench/
 *_sim/
+
+
+# python
+*.pyc
