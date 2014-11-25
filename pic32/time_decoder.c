@@ -40,7 +40,7 @@ int updateDecoder(timeDecoder* decoder, int input)
 }
 
 
-int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime)
+int updateTimeAndDate(timeDecoder* decoder, time_t* currentTime, int* dst)
 {
     char* frame1 = decoder->bitBuffer;
     char* frame2 = decoder->bitBuffer + 60;
@@ -56,7 +56,7 @@ int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime)
         return 1;
 
     /* remove and store dst flag */
-    int dst = frame2Time.tm_isdst;
+    int dstFlag = frame2Time.tm_isdst;
     frame1Time.tm_isdst = frame2Time.tm_isdst = -1;
 
     /* convert to unix time */
@@ -72,12 +72,8 @@ int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime)
         return 1;
 
     /* 60 seconds has passed since the second frame */
-    time_t currentUnixTime = unixTime2 + 60;
-    struct tm* utcTime     = localtime(&currentUnixTime);
-
-    /* add dst flag */
-    *currentTime = *utcTime;
-    currentTime->tm_isdst = dst;
+    *currentTime = unixTime2 + 60;
+    *dst = dstFlag;
 
     return 0;
 }

@@ -31,28 +31,26 @@ void printState(timeDecoder* decoder)
 int testFullTransmission(timeDecoder* decoder)
 {
     char c = getchar();
-
-    if (c == EOF)
-        return -1;
-
-    int bufferFull = 0;
+    int rVal = 0;
 
     while (1) {
         if (c == EOF)
             return -1;
 
         char input = (short) (c - '0');
-        bufferFull = updateDecoder(decoder, input);
+        rVal = updateDecoder(decoder, input);
 
-        if (bufferFull == 3)
+        if (rVal == 3)
             break;
 
         c = getchar();
     }
 
-    struct tm currentTime;
+    struct tm* currentTime;
+    time_t unixTime;
+    int dst;
 
-    int err = updateTimeAndDate(decoder, &currentTime);
+    int err = updateTimeAndDate(decoder, &unixTime, &dst);
     initDecoder(decoder);
 
     if(err) {
@@ -65,11 +63,13 @@ int testFullTransmission(timeDecoder* decoder)
     decoder->bitCount = 1;
     updateInputBuffer(decoder, 0);
 
-    int year = 1900 + currentTime.tm_year;
-    int month = currentTime.tm_mon + 1;
-    int day = currentTime.tm_mday;
-    int hour = currentTime.tm_hour;
-    int minute = currentTime.tm_min;
+    currentTime = localtime(&unixTime);
+
+    int year = 1900 + currentTime->tm_year;
+    int month = currentTime->tm_mon + 1;
+    int day = currentTime->tm_mday;
+    int hour = currentTime->tm_hour;
+    int minute = currentTime->tm_min;
 
     printf("%d-%02d-%02d %02d:%02d\n", year, month, day, hour, minute);
 

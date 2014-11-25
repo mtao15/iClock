@@ -63,12 +63,13 @@ int updateDecoder(timeDecoder* decoder, int input);
  *
  * \param decoder Pointer to timeDecoder.
  * \param currentTime Stores the current time and date if decoding is successful.
+ * \param dst Indicates if DST is in effect.
  *
  * \returns
  *     0: Time signal is successfully decoded
  *     1: Error(s) in time signal.
  */
-int updateTimeAndDate(timeDecoder* decoder, struct tm* currentTime);
+int updateTimeAndDate(timeDecoder* decoder, time_t* currentTime, int* dst);
 
 
 /*
@@ -110,7 +111,7 @@ int funcCountHigh(timeDecoder* decoder, int input);
  * \brief Decode the time and date from one complete frame of transmission.
  *
  * \param frame Pointer to array storing one full frame.
- * \param frameTime Stores the current time and date.
+ * \param frameTime Stores the frame time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
@@ -123,7 +124,7 @@ int decodeFrame(char* frame, struct tm* frameTime);
  * \brief Decode only the time from one complete frame of transmission.
  *
  * \param frame Pointer to array storing one full frame.
- * \param frameTime Stores the current time and date.
+ * \param frameTime Stores the frame time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
@@ -136,7 +137,7 @@ int decodeTime(char* frame, struct tm* frameTime);
  * \brief Decode only the date from one complete frame of transmission.
  *
  * \param frame Pointer to array storing one full frame.
- * \param frameTime Stores the current time and date.
+ * \param frameTime Stores the frame time and date.
  *
  * \returns
  *     0: Time signal is successfully decoded
