@@ -1,5 +1,104 @@
 #include "time_decoder.h"
 
+/******************************************************************************/
+/************* Functions to execute at each state of the decoder **************/
+/******************************************************************************/
+
+int funcWaitForHigh(timeDecoder* decoder, int input)
+{
+    /* detected high raw input */
+    if (input)
+        decoder->currentState = waitForEdge;
+
+    return 0;
+}
+
+
+int funcWaitForEdge(timeDecoder* decoder, int input)
+{
+    /* detected falling edge */
+    if (!input) {
+        decoder->currentState = countLow;
+        updateInputBuffer(decoder, input);
+    }
+
+    return 0;
+}
+
+
+int funcCountLow(timeDecoder* decoder, int input)
+{
+    /* reset decoder if there are too many 0 samples */
+    if (decoder->inputCount >= NSAMPLES) {
+        initDecoder(decoder);
+        return 1;
+    }
+
+    /* update input buffer */
+    updateInputBuffer(decoder, input);
+
+    /* if input is 1, go to countHigh state */
+    if (input)
+        decoder->currentState = countHigh;
+
+    return 0;
+}
+
+
+int funcCountHigh(timeDecoder* decoder, int input)
+{
+    /* check if there is not too many or too few ones */
+    int over  = decoder->inputCount >= NSAMPLES + NSPADDING &&  input;
+    int under = decoder->inputCount <  NSAMPLES - NSPADDING && !input;
+
+    /* reset decoder if there are too many or not enough 1 samples */
+    if (over || under) {
+        initDecoder(decoder);
+        return 1;
+    }
+
+    /* if input is 1, update inputCount and inputBuffer */
+    if (input) {
+        updateInputBuffer(decoder, input);
+        return 0;
+    }
+
+    /* if input is 0, decode bit from inputBuffer and update bitBuffer */
+    int err = updateBitBuffer(decoder);
+
+    /* check for error conditions */
+    switch (err) {
+
+        case 1:    /* inputBuffer does not encode a valid bit */
+            initDecoder(decoder);
+            return err;
+
+        case 2:    /* valid bit, but haven't found start of frame */
+            initDecoder(decoder);
+            updateInputBuffer(decoder, input);
+            decoder->currentState = countLow;
+            return err;
+    }
+
+    /* go to bufferFull state if bitBuffer is now full */
+    if (decoder->bitCount >= BUFFERSIZE) {
+        decoder->currentState = bufferFull;
+        return 3;
+    }
+
+    /* start counting 0's again */
+    decoder->inputCount = 0;
+    decoder->currentState = countLow;
+    updateInputBuffer(decoder, input);
+
+    return 0;
+}
+
+
+/******************************************************************************/
+/************************ Header file implementation **************************/
+/******************************************************************************/
+
 void initDecoder(timeDecoder* decoder)
 {
     /* reset everything to starting state */
@@ -130,97 +229,6 @@ int updateBitBuffer(timeDecoder* decoder)
     }
 
     return 2;
-}
-
-
-int funcWaitForHigh(timeDecoder* decoder, int input)
-{
-    /* detected high raw input */
-    if (input)
-        decoder->currentState = waitForEdge;
-
-    return 0;
-}
-
-
-int funcWaitForEdge(timeDecoder* decoder, int input)
-{
-    /* detected falling edge */
-    if (!input) {
-        decoder->currentState = countLow;
-        updateInputBuffer(decoder, input);
-    }
-
-    return 0;
-}
-
-
-int funcCountLow(timeDecoder* decoder, int input)
-{
-    /* reset decoder if there are too many 0 samples */
-    if (decoder->inputCount >= NSAMPLES) {
-        initDecoder(decoder);
-        return 1;
-    }
-
-    /* update input buffer */
-    updateInputBuffer(decoder, input);
-
-    /* if input is 1, go to countHigh state */
-    if (input)
-        decoder->currentState = countHigh;
-
-    return 0;
-}
-
-
-int funcCountHigh(timeDecoder* decoder, int input)
-{
-    /* check if there is not too many or too few ones */
-    int over  = decoder->inputCount >= NSAMPLES + NSPADDING &&  input;
-    int under = decoder->inputCount <  NSAMPLES - NSPADDING && !input;
-
-    /* reset decoder if there are too many or not enough 1 samples */
-    if (over || under) {
-        initDecoder(decoder);
-        return 1;
-    }
-
-    /* if input is 1, update inputCount and inputBuffer */
-    if (input) {
-        updateInputBuffer(decoder, input);
-        return 0;
-    }
-
-    /* if input is 0, decode bit from inputBuffer and update bitBuffer */
-    int err = updateBitBuffer(decoder);
-
-    /* check for error conditions */
-    switch (err) {
-
-        case 1:    /* inputBuffer does not encode a valid bit */
-            initDecoder(decoder);
-            return err;
-
-        case 2:    /* valid bit, but haven't found start of frame */
-            initDecoder(decoder);
-            updateInputBuffer(decoder, input);
-            decoder->currentState = countLow;
-            return err;
-    }
-
-    /* go to bufferFull state if bitBuffer is now full */
-    if (decoder->bitCount >= BUFFERSIZE) {
-        decoder->currentState = bufferFull;
-        return 3;
-    }
-
-    /* start counting 0's again */
-    decoder->inputCount = 0;
-    decoder->currentState = countLow;
-    updateInputBuffer(decoder, input);
-
-    return 0;
 }
 
 

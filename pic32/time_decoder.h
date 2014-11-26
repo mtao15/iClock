@@ -95,18 +95,6 @@ void updateInputBuffer(timeDecoder* decoder, int input);
 int updateBitBuffer(timeDecoder* decoder);
 
 
-int funcWaitForHigh(timeDecoder* decoder, int input);
-
-
-int funcWaitForEdge(timeDecoder* decoder, int input);
-
-
-int funcCountLow(timeDecoder* decoder, int input);
-
-
-int funcCountHigh(timeDecoder* decoder, int input);
-
-
 /*
  * \brief Decode the time and date from one complete frame of transmission.
  *
