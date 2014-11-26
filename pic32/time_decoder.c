@@ -101,13 +101,14 @@ int updateBitBuffer(timeDecoder* decoder)
     int zero   =     NSAMPLES / 5;
     int one    =     NSAMPLES / 2;
 
+    int padding = NSPADDING / 2;
     char bit;
 
-    if (zeroCounts >= marker - 2 && zeroCounts <= marker + 2)
+    if (zeroCounts >= marker - padding && zeroCounts <= marker + padding)
         bit = 'm';
-    else if (zeroCounts >= zero - 2 && zeroCounts <= zero + 2)
+    else if (zeroCounts >= zero - padding && zeroCounts <= zero + padding)
         bit = 0;
-    else if (zeroCounts >= one - 2 && zeroCounts <= one + 2)
+    else if (zeroCounts >= one - padding && zeroCounts <= one + padding)
         bit = 1;
     else
         return 1;
