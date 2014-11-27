@@ -85,13 +85,19 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 	logic pixelmin;
 	logic pixelhr;
 	logic [5:0] second, minute, hour;
+	logic [5:0] second_in, minute_in;
+	logic [4:0] hour_in;
+	logic [3:0] month_in;
+	logic [4:0] day_in;
+	logic [5:0] year_in;
+	logic synccounter;
+	logic clkgenrange;
    logic stargenrange;
-   logic [15:0] xcursor;
-   logic [15:0] ycursor;
+
   
    // instantiate other modules
-   //spi_receiver spirec(sclk, sdi, xcursor, ycursor);							// read cursor position (from PIC) over spi
-   //assign led[7:0] = xcursor[9:2];													// display top 8 bits of x position to LED
+   spi_receiver spirec(sclk, sdi, hour_in, minute_in, second_in, month_in, day_in, year_in);		// read cursor position (from PIC) over spi
+   assign led[5:0] = second_in;														// display top 8 bits of x position to LED
 
 	circle clkface(10'd320, 10'd240, x, y, 10'd200, pixelcircclk);				// generate circular clock face
 	
@@ -100,7 +106,7 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 	
    rectangle drawrect(10'd0, 10'd0, x, y, 10'd240, 10'd224, pixelrect);		// generate blue rectangle on BG picture
 
-	clkhanddrive clkhands(clk, second, minute, hour);
+	clkhanddrive clkhands(clk, second_in, minute_in, hour_in, second, minute, hour, synccounter);
 	
 	// generate clock hands
 	rotrectangle secondhand(10'd270, 10'd238, x, y, 10'd200, 10'd4, 10'd320, 10'd240, second, pixelsec);
@@ -128,21 +134,21 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
    if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
 		{r_int, g_int, b_int} = {{8{pixelcircclk}}, {8{pixelcircclk}}, {8{pixelcircclk}}};
  
-   // draw stars inside blue rectangle range
-   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used  
-		{r_int, g_int, b_int} = (stargenrange == 1) ? {{8{pixelstar}},{8{pixelstar}},{8{pixelstar}}} : 
-																	24'h000000;
-	// draw blue rectangle
-   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used 
-		begin
-		r_int = 8'h00;
-		g_int = 8'h00;
-		b_int = {{1{pixelrect}}, 7'b00};
-		end
-  
-	// draw stripes
-	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn' already used 
-		{r_int, g_int, b_int} = (y[5]==0) ? {{8'hF0},16'h0000} : 24'hffffff;  
+//   // draw stars inside blue rectangle range
+//   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used  
+//		{r_int, g_int, b_int} = (stargenrange == 1) ? {{8{pixelstar}},{8{pixelstar}},{8{pixelstar}}} : 
+//																	24'h000000;
+//	// draw blue rectangle
+//   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used 
+//		begin
+//		r_int = 8'h00;
+//		g_int = 8'h00;
+//		b_int = {{1{pixelrect}}, 7'b00};
+//		end
+//  
+//	// draw stripes
+//	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn' already used 
+//		{r_int, g_int, b_int} = (y[5]==0) ? {{8'hF0},16'h0000} : 24'hffffff;  
 	end
 endmodule
 
@@ -150,22 +156,38 @@ endmodule
 // This module iterates clock ticks. 
 // Output minute, second, and hour are given in terms of clock tick postions
 module clkhanddrive(input logic clk,
-						output logic [5:0] second, minute, hour);
+						input logic [5:0] second_in, minute_in,
+						input logic [4:0] hour_in,
+						output logic [5:0] second, minute, hour,
+						output logic [31:0] synccounter);
 
-logic [18:0] clkcounter;	// refresh every 0.84s
-logic [15:0] secondcounter;
+logic [24:0] clkcounter;	// refresh every 0.84s
+logic [15:0] secondcounter;	// count total number of seconds passed since the clock was at 12:00:00
+logic [15:0] timein;
+logic [15:0] prevtimein = 0;
 logic [15:0] rem;	//remainder
 
 always_ff @ (posedge clk)
 	begin
 		clkcounter <= clkcounter+1;
-		if(clkcounter == 0)
-			secondcounter <= (secondcounter+1) % 16'd43200;	// increment couner & reset every 216,000s
+		if(clkcounter == 0)		// a new second begins
+			begin
+			secondcounter <= (secondcounter+1) % 16'd43200;		// increment counter & reset every 43,200s (12 hrs)
+			synccounter <= synccounter+1;		// tracks number of seconds passed since last sync
+			end
+		else if(timein != prevtimein)		// new sync input detected
+			begin
+			prevtimein <= timein;
+			secondcounter <= timein;
+			synccounter <= 0;
+			end
+			
 	end
 	
 always_comb
 	begin
-		hour = secondcounter/(60*12);
+		timein = second_in + 60*minute_in + 60*60*hour_in;
+		hour = secondcounter/(60*12);		// converted from hours (0-12) to ticks (0-60)
 		rem = secondcounter % (60*60);
 		minute = rem/60;
 		second = rem % 60;
