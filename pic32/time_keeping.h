@@ -27,7 +27,7 @@ static inline void startSamplingTimer()
 
 static inline void resetSamplingTimer()
 {
-    /* stop and reset timer */
+    /* reset timer counter to 0 */
     TMR2 = 0;
 }
 
@@ -51,7 +51,7 @@ static inline void startTimeKeepingTimer()
 
 static inline void resetTimeKeepingTimer()
 {
-    /* stop and reset timer */
+    /* reset timer counter to 0 */
     TMR4 = 0;
 }
 
@@ -66,6 +66,7 @@ static inline void holdTimeKeepingTimer()
 typedef struct {
     time_t currentTime;       /* current time */
     int    subSecondCount;    /* number of 25ms ticks since last second */
+    int    dst;               /* flag indicating if it's daylight saving time */
 } time_keeper;
 
 
@@ -82,8 +83,9 @@ void tick(time_keeper* timeKeeper);
  *
  * \param timeKeeper Pointer to time_keeper to reset.
  * \param newTime Time to reset timeKeeper to.
+ * \param dst Flag to indicate if daylight saving is in effect.
  */
-void setTime(time_keeper* timeKeeper, time_t newTime);
+void setTime(time_keeper* timeKeeper, time_t newTime, int dst);
 
 
 /*

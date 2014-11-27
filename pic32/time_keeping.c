@@ -9,10 +9,11 @@ void tick(time_keeper* timeKeeper)
 }
 
 
-void setTime(time_keeper* timeKeeper, time_t newTime)
+void setTime(time_keeper* timeKeeper, time_t newTime, int dst)
 {
     timeKeeper->currentTime = newTime;
     timeKeeper->subSecondCount = 0;
+    timeKeeper->dst = dst;
 }
 
 
