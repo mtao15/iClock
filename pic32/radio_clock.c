@@ -1,56 +1,72 @@
 #include "time_keeping.h"
 #include "time_decoder.h"
 
-//SPI
-void SPI_mouseOutput(void){
+
+void initSPI()
+{
 	// SPI setup
 	long readdata;
-	SPI2CON = 0xFFFF7FFF && SPI2CON; 	// turn off SPI
-	readdata = SPI2BUF; 				// read BUF to clear it
-	SPI2BRG = 0x0007;					// set baud rate to 1.25MHz for a 20MHz peripheral clk
-	SPI2CON = SPI2CON | 0x00000920;	// set to Master mode (bit 5), SDO centered on rising clk edge (bit 8), 32 bit mode (bit 11 - 10)
-	SPI2CON = SPI2CON | 0x00008000;	// turn SPI back on
 
+    /* turn off SPI */
+	SPI2CON = 0xFFFF7FFF && SPI2CON;
 
-	// Send mouse position data over SPI
-	short xmouse, ymouse;
-	long outputpos;
-	xmouse = xpos/scale;	// Scaled x mouse location
-	ymouse = ypos/scale;	// Scaled y mouse location
-	outputpos = xmouse;
-	outputpos = outputpos << 16;
-	outputpos = outputpos | ymouse;	// outputpos = {{xmouse}{ymouse}}
-	SPI2BUF = outputpos;
+    /* read BUF to clear it */
+	readdata = SPI2BUF;
+
+    /* set baud rate to 1.25MHz for a 20MHz peripheral clk */
+	SPI2BRG = 0x0007;
+
+    /* set to Master mode (bit 5), SDO centered on rising clk edge (bit 8),
+     * 32 bit mode (bit 11 - 10) */
+	SPI2CON = SPI2CON | 0x00000920;
+
+    /* turn SPI back on */
+	SPI2CON = SPI2CON | 0x00008000;
 }
 
 
-int createPacket(struct tm* timeToSend)
+void sendCurrentTime(int packet)
 {
-    int year = timeToSend->tm_year + 1900;
+	SPI2BUF = packet;
+}
+
+
+int createPacket(struct tm* timeToSend, int packetType)
+{
+    int year = timeToSend->tm_year + 1900 - 2014;
     int month = timeToSend->tm_mon + 1;
     int day = timeToSend->tm_mday;
     int hour = timeToSend->tm_hour;
     int minute = timeToSend->tm_min;
+    int second = timeToSend->tm_sec;
 
-    year  = year << 20;
-    month = month << 16;
-    day   = day << 11;
-    hour  = hour << 6;
+    int header = packetType << 31;
 
-    return year | month | day | hour | minute;
+    year   = year << 26;
+    month  = month << 22;
+    day    = day << 17;
+    hour   = hour << 12;
+    minute = minute << 6;
+
+    return header | year | month | day | hour | minute | second;
 }
 
 
 int main()
 {
-    /* initialize receiver timers */
+    /* initialize receiver board */
     initReceiver();
+
+    /* initialize SPI module */
+    initSPI();
+
+    /* initialize timers */
     resetTimeKeepingTimer();
     resetSamplingTimer();
 
-    /* initialize current time to 00:00:00, Januray 1, 2000 UTC */
+    /* initialize current time to 00:00:00, Januray 1, 2014 UTC */
     time_keeper timeKeeper;
-    setTime(&timeKeeper, 0x386D4380, 0);
+    setTime(&timeKeeper, 1388534400, 0);
 
     /* set up time signal decoder */
     timeDecoder decoder;
@@ -60,29 +76,48 @@ int main()
     startTimeKeepingTimer();
 
     while (1) {
+        /* update time */
+        tick(&timeKeeper);
+
+        /* get output from receiver */
         char x = getReceiverOutput();
 
-        int rVal = updateDecoder(&decoder, x);
-
+        /* update decoder and get its status */
+        int decoderStatus = updateDecoder(&decoder, x);
         PORTD = decoder.bitCount;
 
-        if (rVal == 3) {
-            int err = updateTimeAndDate(&decoder,
-                                        &(timeKeeper.currentTime),
-                                        &(timeKeeper.dst));
+
+        /* if decoder has two full transmission frames */
+        if (decoderStatus == 3) {
+            /* decode the two frames to get current time */
+            time_t currentUnixTime;
+            int dst;
+            int err = updateTimeAndDate(&decoder, &currentUnixTime, &dst);
+
             /* reset decoder */
             initDecoder(&decoder);
 
-            /* covert unix time year, month, day, hour and minute
-             * and encode it in 32 bits */
-            struct tm* timeToSend = localtime(&(timeKeeper.currentTime));
-            int      packetToSend = createPacket(timeToSend);
+            if (!err) {
+                /* update time keeper */
+                setTime(&timeKeeper, currentUnixTime, dst);
+
+                /* send last sync time */
+                struct tm* syncTime = localtime(&currentUnixTime);
+                int syncPacket      = createPacket(syncTime, 0);
+                sendCurrentTime(syncPacket);
+            }
         }
 
-        tick(&timeKeeper);
+        /* send current time to FPGA via SPI */
+        struct tm* timeToSend = localtime(&(timeKeeper.currentTime));
+        int        timePacket = createPacket(timeToSend, 1);
+        sendCurrentTime(timePacket);
+
+        /* pause loop until 25 ms has ellapsed */
         holdTimeKeepingTimer();
         resetTimeKeepingTimer();
     }
+
     return 0;
 }
 
