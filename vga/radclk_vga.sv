@@ -5,6 +5,7 @@
 
 module radclk_vga(input  logic       clk, 
 			  input	logic			sclk, sdi,					// SPI 
+			  input logic	[3:0] s,
 			  output logic       vgaclk,						// 25 MHz VGA clock
 			  output logic       hsync, vsync, sync_b,	// to monitor & DAC
 			  output logic [7:0] r, g, b, led);					// to video DAC
@@ -24,7 +25,7 @@ module radclk_vga(input  logic       clk,
                         r_int, g_int, b_int, r, g, b, x, y);
 	
   // user-defined module to determine pixel color
-  videoGen videoGen(clk, sclk, sdi, x, y, r_int, g_int, b_int, led[7:0]);
+  videoGen videoGen(clk, sclk, sdi, s, x, y, r_int, g_int, b_int, led[7:0]);
   
 endmodule
 
@@ -73,6 +74,7 @@ endmodule
 
 
 module videoGen(input  logic clk, sclk, sdi,						//SPI
+						input logic [3:0] s,
 					 input  logic [9:0] x, y,
            		 output logic [7:0] r_int, g_int, b_int,
 					 output logic [7:0] led);
@@ -84,6 +86,7 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 	logic pixelsec;
 	logic pixelmin;
 	logic pixelhr;
+	logic header;
 	logic [5:0] second, minute, hour;
 	logic [5:0] second_in, minute_in;
 	logic [4:0] hour_in;
@@ -96,22 +99,19 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 
   
    // instantiate other modules
-   spi_receiver spirec(sclk, sdi, hour_in, minute_in, second_in, month_in, day_in, year_in);		// read cursor position (from PIC) over spi
-   assign led[5:0] = second_in;														// display top 8 bits of x position to LED
+   spi_receiver spirec(sclk, sdi, s, header, hour_in, minute_in, second_in, month_in, day_in, year_in);		// read cursor position (from PIC) over spi
+   //assign led[5:0] = minute_in;														// display top 8 bits of x position to LED
 
 	circle clkface(10'd320, 10'd240, x, y, 10'd200, pixelcircclk);				// generate circular clock face
 	
-   stargenrom stargenromb(x, y, pixelstar);  										// generate stars on BG flag picture
    assign stargenrange = (x <= 10'd240) & (y <= 10'd224);						// note if (x,y) is inside blue rectangle
 	
    rectangle drawrect(10'd0, 10'd0, x, y, 10'd240, 10'd224, pixelrect);		// generate blue rectangle on BG picture
-
-	clkhanddrive clkhands(clk, second_in, minute_in, hour_in, second, minute, hour, synccounter);
 	
 	// generate clock hands
-	rotrectangle secondhand(10'd270, 10'd238, x, y, 10'd200, 10'd4, 10'd320, 10'd240, second, pixelsec);
-	rotrectangle minutehand(10'd280, 10'd237, x, y, 10'd200, 10'd6, 10'd320, 10'd240, minute, pixelmin);
-	rotrectangle hourhand(10'd280, 10'd236, x, y, 10'd150, 10'd8, 10'd320, 10'd240, hour, pixelhr);
+	rotrectangle secondhand(10'd270, 10'd238, x, y, 10'd200, 10'd4, 10'd320, 10'd240, second_in, pixelsec);
+	rotrectangle minutehand(10'd280, 10'd237, x, y, 10'd200, 10'd6, 10'd320, 10'd240, minute_in, pixelmin);
+	rotrectangle hourhand(10'd280, 10'd236, x, y, 10'd150, 10'd8, 10'd320, 10'd240, hour_in*5 + minute_in/12, pixelhr);
 
 	clkgenrom clkgen(x-10'd377, y-10'd40, pixelclk);								// generate clock tick pattern
 	assign clkgenrange = (x >= 10'd120) & (x <= 10'd520) & (y >= 10'd40) & (y <= 10'd440);		// check if(x,y) is consrained to clock face dimension (400x400)
@@ -134,85 +134,14 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
    if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
 		{r_int, g_int, b_int} = {{8{pixelcircclk}}, {8{pixelcircclk}}, {8{pixelcircclk}}};
  
-//   // draw stars inside blue rectangle range
-//   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used  
-//		{r_int, g_int, b_int} = (stargenrange == 1) ? {{8{pixelstar}},{8{pixelstar}},{8{pixelstar}}} : 
-//																	24'h000000;
-//	// draw blue rectangle
-//   if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used 
-//		begin
-//		r_int = 8'h00;
-//		g_int = 8'h00;
-//		b_int = {{1{pixelrect}}, 7'b00};
-//		end
-//  
-//	// draw stripes
-//	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn' already used 
-//		{r_int, g_int, b_int} = (y[5]==0) ? {{8'hF0},16'h0000} : 24'hffffff;  
 	end
 endmodule
 
 
-// This module iterates clock ticks. 
-// Output minute, second, and hour are given in terms of clock tick postions
-module clkhanddrive(input logic clk,
-						input logic [5:0] second_in, minute_in,
-						input logic [4:0] hour_in,
-						output logic [5:0] second, minute, hour,
-						output logic [31:0] synccounter);
-
-logic [24:0] clkcounter;	// refresh every 0.84s
-logic [15:0] secondcounter;	// count total number of seconds passed since the clock was at 12:00:00
-logic [15:0] timein;
-logic [15:0] prevtimein = 0;
-logic [15:0] rem;	//remainder
-
-always_ff @ (posedge clk)
-	begin
-		clkcounter <= clkcounter+1;
-		if(clkcounter == 0)		// a new second begins
-			begin
-			secondcounter <= (secondcounter+1) % 16'd43200;		// increment counter & reset every 43,200s (12 hrs)
-			synccounter <= synccounter+1;		// tracks number of seconds passed since last sync
-			end
-		else if(timein != prevtimein)		// new sync input detected
-			begin
-			prevtimein <= timein;
-			secondcounter <= timein;
-			synccounter <= 0;
-			end
-			
-	end
-	
-always_comb
-	begin
-		timein = second_in + 60*minute_in + 60*60*hour_in;
-		hour = secondcounter/(60*12);		// converted from hours (0-12) to ticks (0-60)
-		rem = secondcounter % (60*60);
-		minute = rem/60;
-		second = rem % 60;
-	end
-endmodule
 
 
-// This module draws the stars on the american flag
-module stargenrom(input  logic [9:0] x, y,
-						output logic       pixel);
-						
-  logic [239:0] stars[223:0]; 			// star generator ROM
-  logic [239:0] line;            		// a line read from the ROM
-  
-  // initialize ROM with characters from text file 
-  initial 
-	 $readmemb("stars.txt", stars);		// .txt file of star pattern
-	 
-  // index into ROM to find line of character
-  assign line = {stars[y]}; 
-  
-  // reverse order of bits
-  assign pixel = line[8'd239-x];
-endmodule  
-  
+
+
   
 // This module draws the clock face  
 module clkgenrom(input  logic [9:0] x, y,
@@ -231,9 +160,6 @@ module clkgenrom(input  logic [9:0] x, y,
   // reverse order of bits
   assign pixel = line[8'd399-x];
 endmodule
-
-
-
 
 
 
