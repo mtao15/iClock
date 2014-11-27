@@ -1,6 +1,8 @@
 #include "time_keeping.h"
 #include "time_decoder.h"
 
+/* offset for pacific time zone */
+#define TIMEZONE -28800
 
 void initSPI()
 {
@@ -8,7 +10,7 @@ void initSPI()
 	long readdata;
 
     /* turn off SPI */
-	SPI2CON = 0xFFFF7FFF && SPI2CON;
+	SPI2CON = 0x0;//0xFFFF7FFF & SPI2CON;
 
     /* read BUF to clear it */
 	readdata = SPI2BUF;
@@ -74,6 +76,7 @@ int main()
 
     /* start timer */
     startTimeKeepingTimer();
+    startSamplingTimer();
 
     while (1) {
         /* update time */
@@ -82,10 +85,11 @@ int main()
         /* get output from receiver */
         char x = getReceiverOutput();
 
+        int packetHeader = 1;
+
         /* update decoder and get its status */
         int decoderStatus = updateDecoder(&decoder, x);
         PORTD = decoder.bitCount;
-
 
         /* if decoder has two full transmission frames */
         if (decoderStatus == 3) {
@@ -101,16 +105,18 @@ int main()
                 /* update time keeper */
                 setTime(&timeKeeper, currentUnixTime, dst);
 
-                /* send last sync time */
-                struct tm* syncTime = localtime(&currentUnixTime);
-                int syncPacket      = createPacket(syncTime, 0);
-                sendCurrentTime(syncPacket);
+                /* next data packet will indicate sync has happened */
+                packetHeader = 0;
             }
         }
 
-        /* send current time to FPGA via SPI */
-        struct tm* timeToSend = localtime(&(timeKeeper.currentTime));
-        int        timePacket = createPacket(timeToSend, 1);
+        /* offset utc time to local time */
+        int dstOffset           = timeKeeper.dst * 3600;
+        time_t currentLocalTime = timeKeeper.currentTime + TIMEZONE + dstOffset;
+
+        /* send current local time to FPGA via SPI */
+        struct tm* timeToSend = localtime(&currentLocalTime);
+        int        timePacket = createPacket(timeToSend, packetHeader);
         sendCurrentTime(timePacket);
 
         /* pause loop until 25 ms has ellapsed */

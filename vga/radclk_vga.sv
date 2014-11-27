@@ -8,7 +8,7 @@ module radclk_vga(input  logic       clk,
 			  input logic	[3:0] s,
 			  output logic       vgaclk,						// 25 MHz VGA clock
 			  output logic       hsync, vsync, sync_b,	// to monitor & DAC
-			  output logic [7:0] r, g, b, led);					// to video DAC
+			  output logic [7:0] r, g, b);					// to video DAC
  
   logic [9:0] x, y;
   logic [7:0] r_int, g_int, b_int;
@@ -25,7 +25,7 @@ module radclk_vga(input  logic       clk,
                         r_int, g_int, b_int, r, g, b, x, y);
 	
   // user-defined module to determine pixel color
-  videoGen videoGen(clk, sclk, sdi, s, x, y, r_int, g_int, b_int, led[7:0]);
+  videoGen videoGen(clk, sclk, sdi, s, x, y, r_int, g_int, b_int);
   
 endmodule
 
@@ -76,8 +76,7 @@ endmodule
 module videoGen(input  logic clk, sclk, sdi,						//SPI
 						input logic [3:0] s,
 					 input  logic [9:0] x, y,
-           		 output logic [7:0] r_int, g_int, b_int,
-					 output logic [7:0] led);
+           		 output logic [7:0] r_int, g_int, b_int);
 	
 	logic pixelstar;
    logic pixelrect;
@@ -100,7 +99,7 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
   
    // instantiate other modules
    spi_receiver spirec(sclk, sdi, s, header, hour_in, minute_in, second_in, month_in, day_in, year_in);		// read cursor position (from PIC) over spi
-   //assign led[5:0] = minute_in;														// display top 8 bits of x position to LED
+  // assign led[5:0] = minute_in;														// display top 8 bits of x position to LED
 
 	circle clkface(10'd320, 10'd240, x, y, 10'd200, pixelcircclk);				// generate circular clock face
 	

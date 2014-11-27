@@ -31,7 +31,7 @@ char getReceiverOutput()
 {
     /* get input from RF0, output from board is negated */
     char accum = ~PORTF & 0x1;
-    startSamplingTimer();
+    resetSamplingTimer();
 
     /* get a sample every millisecond */
     int intervalCount = MS10 / 10;
@@ -44,11 +44,9 @@ char getReceiverOutput()
         }
     }
 
-    resetSamplingTimer();
 
     /* write to led for debugging */
     char avg = accum / count;
-//    PORTD = avg;
 
     return avg;
 }
