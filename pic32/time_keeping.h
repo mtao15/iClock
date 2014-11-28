@@ -4,8 +4,8 @@
 #include <P32xxxx.h>
 #include <time.h>
 
-#define MS25 15625
-#define MS10 6250
+#define MS25 62500    /* prescaler of 8  */
+#define MS10 6250     /* prescaler of 32 */
 
 static inline void startSamplingTimer()
 {
@@ -40,13 +40,13 @@ static inline void startTimeKeepingTimer()
      *     bit 13  : SIDL  = 0  : keep running in idle mode
      *     bit 12-8: unused
      *     bit 7   : TGATE = 0  : disable gated accumulation
-     *     bit 6-4 : TCKPS = 101: 1:32 prescaler
+     *     bit 6-4 : TCKPS = 011: 1:8 prescaler
      *     bit 3   : T32   = 0  : 16 bit timer
      *     bit 2   : unused
      *     bit 1   : TCS   = 0  : use internal peripheral clock
      *     bit 0   : unused
      */
-    T4CON = 0x8050;
+    T4CON = 0x8030;
 }
 
 static inline void resetTimeKeepingTimer()

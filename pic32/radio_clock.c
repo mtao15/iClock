@@ -107,6 +107,11 @@ int main()
 
                 /* next data packet will indicate sync has happened */
                 packetHeader = 0;
+
+                /* if good sync, keep first marker and keep going */
+                decoder.currentState = countLow;
+                decoder.bitCount = 1;
+                updateInputBuffer(&decoder, x);
             }
         }
 

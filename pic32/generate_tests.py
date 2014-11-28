@@ -17,7 +17,7 @@ signal.write(bitNoiseStart)
 
 for x in xrange(lines):
     (testSignal, syncFinishTime) =\
-            generateTests(bitNoise=continuous, randomNoise=continuous)
+            generateTests(bitNoise=not continuous, randomNoise=not continuous)
     timeString = syncFinishTime.strftime('%Y-%m-%d %H:%M')
 
     signal.write(testSignal)
