@@ -8,7 +8,7 @@ module radclk_vga(input  logic       clk,
 			  input logic	[3:0] s,
 			  output logic       vgaclk,						// 25 MHz VGA clock
 			  output logic       hsync, vsync, sync_b,	// to monitor & DAC
-			  output logic [7:0] r, g, b);					// to video DAC
+			  output logic [7:0] r, g, b, led);					// to video DAC
  
   logic [9:0] x, y;
   logic [7:0] r_int, g_int, b_int;
@@ -25,7 +25,7 @@ module radclk_vga(input  logic       clk,
                         r_int, g_int, b_int, r, g, b, x, y);
 	
   // user-defined module to determine pixel color
-  videoGen videoGen(clk, sclk, sdi, s, x, y, r_int, g_int, b_int);
+  videoGen videoGen(clk, sclk, sdi, s, x, y, r_int, g_int, b_int, led[7:0]);
   
 endmodule
 
@@ -76,7 +76,8 @@ endmodule
 module videoGen(input  logic clk, sclk, sdi,						//SPI
 						input logic [3:0] s,
 					 input  logic [9:0] x, y,
-           		 output logic [7:0] r_int, g_int, b_int);
+           		 output logic [7:0] r_int, g_int, b_int,
+					 output logic [7:0] led);
 	
 	logic pixelstar;
    logic pixelrect;
@@ -85,7 +86,6 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 	logic pixelsec;
 	logic pixelmin;
 	logic pixelhr;
-	logic pixeldisplay;
 	logic header;
 	logic [5:0] second, minute, hour;
 	logic [5:0] second_in, minute_in;
@@ -100,20 +100,20 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
   
    // instantiate other modules
    spi_receiver spirec(sclk, sdi, s, header, hour_in, minute_in, second_in, month_in, day_in, year_in);		// read cursor position (from PIC) over spi
-  // assign led[5:0] = minute_in;														// display top 8 bits of x position to LED
-	//datetimedisp dateandtime(x, y, header, second_in, minute_in, hour_in, month_in, day_in, year_in, pixeldisplay);
-	datetimedisp dateandtime(x, y, header, second_in, minute_in, hour_in, month_in, day_in, year_in, pixeldisplay);
-  
+   //assign led[5:0] = second_in;														// display top 8 bits of x position to LED
+
 	circle clkface(10'd320, 10'd240, x, y, 10'd200, pixelcircclk);				// generate circular clock face
 	
    assign stargenrange = (x <= 10'd240) & (y <= 10'd224);						// note if (x,y) is inside blue rectangle
 	
    rectangle drawrect(10'd0, 10'd0, x, y, 10'd240, 10'd224, pixelrect);		// generate blue rectangle on BG picture
+
+	clkhanddrive clkhands(clk, header, second_in, minute_in, hour_in, second, minute, hour, synccounter);
 	
 	// generate clock hands
-	rotrectangle secondhand(10'd270, 10'd238, x, y, 10'd200, 10'd4, 10'd320, 10'd240, second_in, pixelsec);
-	rotrectangle minutehand(10'd280, 10'd237, x, y, 10'd200, 10'd6, 10'd320, 10'd240, minute_in, pixelmin);
-	rotrectangle hourhand(10'd280, 10'd236, x, y, 10'd150, 10'd8, 10'd320, 10'd240, hour_in*5 + minute_in/12, pixelhr);
+	rotrectangle secondhand(10'd270, 10'd238, x, y, 10'd200, 10'd4, 10'd320, 10'd240, second, pixelsec);
+	rotrectangle minutehand(10'd280, 10'd237, x, y, 10'd200, 10'd6, 10'd320, 10'd240, minute, pixelmin);
+	rotrectangle hourhand(10'd280, 10'd236, x, y, 10'd150, 10'd8, 10'd320, 10'd240, hour, pixelhr);
 
 	clkgenrom clkgen(x-10'd377, y-10'd40, pixelclk);								// generate clock tick pattern
 	assign clkgenrange = (x >= 10'd120) & (x <= 10'd520) & (y >= 10'd40) & (y <= 10'd440);		// check if(x,y) is consrained to clock face dimension (400x400)
@@ -121,7 +121,7 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
    always_comb
    begin
 	// draw clock hands
-		{r_int, g_int, b_int} = {{8{pixelsec}}, {16'h0000}};
+	{r_int, g_int, b_int} = {{8{pixelsec}}, {16'h0000}};
 	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
 		{r_int, g_int, b_int} = {{7'h0, {1{pixelmin}}}, {7'h0, {1{pixelmin}}}, {7'h0, {1{pixelmin}}}};
 	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
@@ -131,166 +131,63 @@ module videoGen(input  logic clk, sclk, sdi,						//SPI
 	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
 		{r_int, g_int, b_int} = (clkgenrange == 1) ? {{7'h0, {1{pixelclk}}}, {7'h0, {1{pixelclk}}}, {7'h0, {1{pixelclk}}}}:
 																24'h000000;
-																
+		
    // draw circular clock face at center of screen
    if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
 		{r_int, g_int, b_int} = {{8{pixelcircclk}}, {8{pixelcircclk}}, {8{pixelcircclk}}};
-		
-	// digital time display
-	if (r_int == 8'h00 & g_int == 8'h00 & b_int == 8'h00)		// pixel isn't already used
-		{r_int, g_int, b_int} = {{8{pixeldisplay}}, {8{pixeldisplay}}, {8{pixeldisplay}}};
-		
+ 
 	end
 endmodule
 
 
+// This module iterates clock ticks. 
+// Output minute, second, and hour are given in terms of clock tick postions
+module clkhanddrive(input logic clk,
+						input logic header,
+						input logic [5:0] second_in, minute_in,
+						input logic [4:0] hour_in,
+						output logic [5:0] second, minute, hour,
+						output logic [31:0] synccounter);
 
-module datetimedisp (input logic [9:0] x, y,
-							input logic header,
-							input logic [5:0] second_in, minute_in,
-							input logic [4:0] hour_in,
-							input logic [3:0] month_in,
-							input logic [4:0] day_in,
-							input logic [5:0] year_in, 
-							output logic pixel);
+logic [25:0] clkcounter;	
+logic [15:0] secondcounter;	// count total number of seconds passed since the clock was at 12:00:00
+logic [15:0] timein;
 
-logic [50:0] pixelarray;
-logic [9:0] yoffset;
-logic [9:0] xoffset;
-logic [9:0] charheight;
-logic [9:0] charwidth;
-logic [3:0] syncmonth;
-logic [4:0] syncday;
-logic [5:0] syncyear;
-logic [5:0] syncsec, syncmin;
-logic [4:0] synchr;
+logic [15:0] prevtimein = 0;
+logic [15:0] rem;					//remainder
 
-assign yoffset = 10'd40;
-assign xoffset = 10'd30;
-assign charheight = 10'd8;
-assign charwidth = 10'd8;
+always_ff @ (posedge clk)
+	begin
+//		clkcounter <= clkcounter+1;
+//		if(clkcounter == 26'd40000000)		// a new second begins
+//			begin
+//			clkcounter <= 0;						// reset clock counter 
+//			secondcounter <= (secondcounter+1) % 16'd43200;		// increment counter & reset every 43,200s (12 hrs)
+//			synccounter <= synccounter+1;		// tracks number of seconds passed since last sync
+//			end
+//		else if(timein != prevtimein)		// new sync input detected
+//			begin
+//			prevtimein <= timein;
+//			secondcounter <= timein;
+//			synccounter <= 0;
+//			end
+//			
+	end
+	
+always_comb
+	begin
+//		timein = second_in + 60*minute_in + 60*60*hour_in;
+//		hour = secondcounter/(60*12);		// converted from hours (0-12) to ticks (0-60)
+//		rem = secondcounter % (60*60);
+//		minute = rem/60;
+//		second = rem % 60;
 
-// Store time of last sync
-assign syncmonth = ~header ? month_in : syncmonth;
-assign syncday = ~header ? day_in : syncday;
-assign syncyear = ~header ? year_in : syncyear;
-assign syncsec = ~header ? second_in : syncsec;
-assign syncmin = ~header ? minute_in : syncmin;
-assign synchr = ~header ? hour_in : synchr;
-
-// Generate static text
-chargenrom C1(xoffset, yoffset, x, y, 8'd67, pixelarray[0]); 						// generate character "C"
-chargenrom U1(xoffset+charwidth, yoffset, x, y, 8'd85, pixelarray[1]); 			// generate character "U"
-chargenrom R1(xoffset+charwidth*2, yoffset, x, y, 8'd82, pixelarray[2]); 		// generate character "R"
-chargenrom R2(xoffset+charwidth*3, yoffset, x, y, 8'd82, pixelarray[3]); 		// generate character "R"
-chargenrom E1(xoffset+charwidth*4, yoffset, x, y, 8'd69, pixelarray[4]); 		// generate character "E"
-chargenrom N1(xoffset+charwidth*5, yoffset, x, y, 8'd78, pixelarray[5]); 		// generate character "N"
-chargenrom T1(xoffset+charwidth*6, yoffset, x, y, 8'd84, pixelarray[6]); 		// generate character "T"
-
-chargenrom T2(xoffset+charwidth*8, yoffset, x, y, 8'd84, pixelarray[7]); 		// generate character "T"
-chargenrom I1(xoffset+charwidth*9, yoffset, x, y, 8'd73, pixelarray[8]); 		// generate character "I"
-chargenrom M1(xoffset+charwidth*10, yoffset, x, y, 8'd77, pixelarray[9]); 		// generate character "M"
-chargenrom E2(xoffset+charwidth*11, yoffset, x, y, 8'd69, pixelarray[10]); 	// generate character "E"
-
-chargenrom L1(xoffset+charwidth*61, yoffset, x, y, 8'd76, pixelarray[11]); 	// generate character "L"
-chargenrom A1(xoffset+charwidth*62, yoffset, x, y, 8'd65, pixelarray[12]); 	// generate character "A"
-chargenrom S1(xoffset+charwidth*63, yoffset, x, y, 8'd83, pixelarray[13]); 	// generate character "S"
-chargenrom T3(xoffset+charwidth*64, yoffset, x, y, 8'd84, pixelarray[14]); 	// generate character "T"
-
-chargenrom S2(xoffset+charwidth*66, yoffset, x, y, 8'd83, pixelarray[15]); 	// generate character "S"
-chargenrom Y1(xoffset+charwidth*67, yoffset, x, y, 8'd89, pixelarray[16]); 	// generate character "Y"
-chargenrom N2(xoffset+charwidth*68, yoffset, x, y, 8'd78, pixelarray[17]); 	// generate character "N"
-chargenrom C2(xoffset+charwidth*69, yoffset, x, y, 8'd67, pixelarray[18]); 	// generate character "C"
-
-// Generate current date
-mongenrom mon(xoffset+charwidth, yoffset+charheight*3/2, x, y, month_in, pixelarray[19]); 				// char representation for month
-chargenrom day10(xoffset+charwidth*5, yoffset+charheight*3/2, x, y, 8'd48+(day_in/8'd10), pixelarray[20]);		// tens digit of day
-chargenrom day1(xoffset+charwidth*6, yoffset+charheight*3/2, x, y, 8'd48+(day_in % 8'd10), pixelarray[21]);	// ones digit of day
-chargenrom year3(xoffset+charwidth*8, yoffset+charheight*3/2, x, y, 8'd50, pixelarray[22]);	// thoudsands digit of year (2)
-chargenrom year2(xoffset+charwidth*9, yoffset+charheight*3/2, x, y, 8'd48, pixelarray[23]);	// chundreds digit of year (0)
-chargenrom year1(xoffset+charwidth*10, yoffset+charheight*3/2, x, y, 8'd48+((year_in+8'd14)/8'd10), pixelarray[24]);	// tens digit of year
-chargenrom year0(xoffset+charwidth*11, yoffset+charheight*3/2, x, y, 8'd48+((year_in+8'd14) % 8'd10), pixelarray[25]);	// ones digit of year
-
-// Generate current time
-chargenrom hour10(xoffset+charwidth*2, yoffset+charheight*3, x, y, 8'd48+(hour_in/8'd10), pixelarray[26]);	// tens digit of hour
-chargenrom hour1(xoffset+charwidth*3, yoffset+charheight*3, x, y, 8'd48+(hour_in % 8'd10), pixelarray[27]);	// ones digit of hour
-chargenrom colon1(xoffset+charwidth*4, yoffset+charheight*3, x, y, 8'd58, pixelarray[28]);	// :
-chargenrom min10(xoffset+charwidth*5, yoffset+charheight*3, x, y, 8'd48+(minute_in/8'd10), pixelarray[29]);	// tens digit of hour
-chargenrom min1(xoffset+charwidth*6, yoffset+charheight*3, x, y, 8'd48+(minute_in % 8'd10), pixelarray[30]);	// ones digit of hour
-chargenrom colon2(xoffset+charwidth*7, yoffset+charheight*3, x, y, 8'd58, pixelarray[31]);	// :
-chargenrom sec10(xoffset+charwidth*8, yoffset+charheight*3, x, y, 8'd48+(second_in/8'd10), pixelarray[32]);	// tens digit of hour
-chargenrom sec1(xoffset+charwidth*9, yoffset+charheight*3, x, y, 8'd48+(second_in % 8'd10), pixelarray[33]);	// ones digit of hour
-
-// Generate date of last sync
-mongenrom syncmon(xoffset+charwidth*60, yoffset+charheight*3/2, x, y, syncmonth, pixelarray[34]);	// char representation for month
-chargenrom syncday10(xoffset+charwidth*64, yoffset+charheight*3/2, x, y, 8'd48+(syncday/8'd10), pixelarray[35]);		// tens digit of day
-chargenrom syncday1(xoffset+charwidth*65, yoffset+charheight*3/2, x, y, 8'd48+(syncday % 8'd10), pixelarray[36]);	// ones digit of day
-chargenrom syncyear3(xoffset+charwidth*67, yoffset+charheight*3/2, x, y, 8'd50, pixelarray[37]);	// thoudsands digit of year (2)
-chargenrom syncyear2(xoffset+charwidth*68, yoffset+charheight*3/2, x, y, 8'd48, pixelarray[38]);	// chundreds digit of year (0)
-chargenrom syncyear1(xoffset+charwidth*69, yoffset+charheight*3/2, x, y, 8'd48+((syncyear+8'd14)/8'd10), pixelarray[39]);	// tens digit of year
-chargenrom syncyear0(xoffset+charwidth*70, yoffset+charheight*3/2, x, y, 8'd48+((syncyear+8'd14) % 8'd10), pixelarray[40]);	// ones digit of year
-
-// Generate time of last sync
-chargenrom synchour10(xoffset+charwidth*61, yoffset+charheight*3, x, y, 8'd48+(synchr/8'd10), pixelarray[41]);	// tens digit of hour
-chargenrom synchour1(xoffset+charwidth*62, yoffset+charheight*3, x, y, 8'd48+(synchr % 8'd10), pixelarray[42]);	// ones digit of hour
-chargenrom synccolon1(xoffset+charwidth*63, yoffset+charheight*3, x, y, 8'd58, pixelarray[43]);	// :
-chargenrom syncmin10(xoffset+charwidth*64, yoffset+charheight*3, x, y, 8'd48+(syncmin/8'd10), pixelarray[44]);	// tens digit of hour
-chargenrom syncmin1(xoffset+charwidth*65, yoffset+charheight*3, x, y, 8'd48+(syncmin % 8'd10), pixelarray[45]);	// ones digit of hour
-chargenrom synccolon2(xoffset+charwidth*66, yoffset+charheight*3, x, y, 8'd58, pixelarray[46]);	// :
-chargenrom syncsec10(xoffset+charwidth*67, yoffset+charheight*3, x, y, 8'd48+(syncsec/8'd10), pixelarray[47]);	// tens digit of hour
-chargenrom syncsec1(xoffset+charwidth*68, yoffset+charheight*3, x, y, 8'd48+(syncsec % 8'd10), pixelarray[48]);	// ones digit of hour
-
-
-assign pixel = pixelarray > 0;
+		hour = hour_in*60/12;		// converted from hours (0-12) to ticks (0-60)
+		minute = minute_in;
+		second = second_in;
+	end
 endmodule
-
-
-
-module chargenrom(input  logic [9:0] xstart, ystart, x, y,
-						input  logic [7:0]ch,
-						output logic pixel);
-						
-  logic [5:0] charrom[743:0]; // character generator ROM
-  logic [7:0] line;            // a line read from the ROM
-  logic [9:0] xdiff, ydiff;
-
-  assign xdiff = x - xstart;
-  assign ydiff = y - ystart;
   
-  // initialize ROM with characters from text file 
-  initial 
-	 $readmemb("charrom.txt", charrom);
-	 
-  // index into ROM to find line of character
-  assign line = {charrom[ydiff[2:0]+{ch, 3'b000}]}; 
-  // reverse order of bits & decide if pixel is within range of desired character
-  assign pixel = ((ydiff < 10'd8) & (xdiff <= 10'd8)) ? line[3'd7-xdiff[2:0]] : 0;
-endmodule
-
-
-
-module mongenrom(input  logic [9:0] xstart, ystart, x, y,
-						input  logic [3:0] month,
-						output logic pixel);
-						
-  logic [23:0] monthrom[110:0]; // character generator ROM
-  logic [23:0] line;            // a line read from the ROM
-  logic [9:0] xdiff, ydiff;
-
-  assign xdiff = x - xstart;
-  assign ydiff = y - ystart;
-  
-  // initialize ROM with characters from text file 
-  initial 
-	 $readmemb("monthrom.txt", monthrom);
-	 
-  // index into ROM to find line of character
-  assign line = {monthrom[ydiff[2:0]+{month, 3'b000}]}; 
-  // reverse order of bits & decide if pixel is within range of desired character
-  assign pixel = ((ydiff < 10'd8) & (xdiff <= 10'd24)) ? line[5'd24-xdiff[4:0]] : 0;
-endmodule
-
-
   
 // This module draws the clock face  
 module clkgenrom(input  logic [9:0] x, y,

@@ -4,7 +4,7 @@ JedecChain;
 	DefaultMfr(6E);
 
 	P ActionCode(Cfg)
-		Device PartName(EP3C5) Path("//charlie.ac.hmc.edu/HMC_2015/mtao/E155/FinalProject/vga/") File("radclk_vga_1.jic") MfrSpec(OpMask(1) SEC_Device(EPCS4) Child_OpMask(1 1));
+		Device PartName(EP3C5E144) Path("//charlie.ac.hmc.edu/HMC_2015/mtao/E155/FinalProject/vga/") File("lab7_mt_vga.sof") MfrSpec(OpMask(1));
 
 ChainEnd;
 
