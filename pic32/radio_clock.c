@@ -6,30 +6,30 @@
 
 void initSPI()
 {
-	// SPI setup
-	long readdata;
+    // SPI setup
+    long readdata;
 
     /* turn off SPI */
-	SPI2CON = 0x0;//0xFFFF7FFF & SPI2CON;
+    SPI2CON = 0x0;//0xFFFF7FFF & SPI2CON;
 
     /* read BUF to clear it */
-	readdata = SPI2BUF;
+    readdata = SPI2BUF;
 
     /* set baud rate to 1.25MHz for a 20MHz peripheral clk */
-	SPI2BRG = 0x0007;
+    SPI2BRG = 0x0007;
 
     /* set to Master mode (bit 5), SDO centered on rising clk edge (bit 8),
      * 32 bit mode (bit 11 - 10) */
-	SPI2CON = SPI2CON | 0x00000920;
+    SPI2CON = SPI2CON | 0x00000920;
 
     /* turn SPI back on */
-	SPI2CON = SPI2CON | 0x00008000;
+    SPI2CON = SPI2CON | 0x00008000;
 }
 
 
 void sendCurrentTime(int packet)
 {
-	SPI2BUF = packet;
+    SPI2BUF = packet;
 }
 
 
@@ -66,9 +66,9 @@ int main()
     resetTimeKeepingTimer();
     resetSamplingTimer();
 
-    /* initialize current time to 00:00:00, Januray 1, 2014 UTC */
+    /* initialize current time to 00:00:00, Januray 2, 2014 UTC */
     time_keeper timeKeeper;
-    setTime(&timeKeeper, 1388534400, 0);
+    setTime(&timeKeeper, 1388620800, 0);
 
     /* set up time signal decoder */
     timeDecoder decoder;
