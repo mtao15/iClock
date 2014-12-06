@@ -3,8 +3,8 @@
 
 #include <time.h>
 
-#define NSAMPLES 40
-#define NSPADDING 4
+#define NSAMPLES 10
+#define NSPADDING 2
 #define BUFFERSIZE 120
 
 enum STATE {

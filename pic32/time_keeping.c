@@ -2,7 +2,7 @@
 
 void tick(time_keeper* timeKeeper)
 {
-    if (++(timeKeeper->subSecondCount) >= 40) {
+    if (++(timeKeeper->subSecondCount) >= NTICKS) {
         timeKeeper->subSecondCount = 0;
         timeKeeper->currentTime++;
     }
@@ -34,10 +34,10 @@ char getReceiverOutput()
     resetSamplingTimer();
 
     /* get a sample every millisecond */
-    int intervalCount = MS10 / 10;
+    int intervalCount = MS90 / 1000;
     int count = 1;
 
-    while (TMR2 < MS10) {
+    while (TMR2 < MS90) {
         if (TMR2 % intervalCount == 0) {
             accum += ~PORTF & 0x1;
             count++;
