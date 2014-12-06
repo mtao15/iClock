@@ -80,6 +80,7 @@ def generateTimeSignal(year, month, day, hour, minute):
         signal += generateBit(bit)
     return signal
 
+
 def fillPreDefinedBits(frame):
     frame[0]  = 'm' ; frame[4]  =  0 ; frame[9]  = 'm';
     frame[10] =  0  ; frame[11] =  0 ; frame[14] =  0 ;
@@ -89,27 +90,7 @@ def fillPreDefinedBits(frame):
     frame[49] = 'm' ; frame[54] =  0 ; frame[59] = 'm';
 
 
-def generateNoise():
-    length = random.randint(10,60)
-    noise = [random.randint(0,1) for x in xrange(length)]
-
-    out = ''
-    for x in noise:
-        out += str(x)
-
-    return out
-
-def generateBitNoise():
-    out = ''
-    nPad = random.randint(2, 10)
-    for x in xrange(nPad):
-        bit = random.randint(0, 1)
-        out += generateBit(bit)
-
-    return out
-
-
-def generateTests(bitNoise=True, randomNoise=True):
+def generateTests():
     epoch = datetime.datetime(year=2000, month=1, day=1, hour=0, minute=0, second = 0)
 
     frame1Time = epoch + datetime.timedelta(seconds=random.randint(0, 32*31536000))
@@ -122,16 +103,8 @@ def generateTests(bitNoise=True, randomNoise=True):
     frame2Signal = generateTimeSignal(frame2Time.year - 2000, frame2Time.month,\
                                       frame2Time.day,frame2Time.hour, frame2Time.minute)
 
-    bitNoiseStart = bitNoiseEnd = randomNoiseStart = ''
 
-    if bitNoise:
-        bitNoiseStart = generateBitNoise() + generateBit('m')
-        bitNoiseEnd = generateBitNoise()
-
-    if randomNoise:
-        randomNoiseStart = generateNoise()
-
-    out = randomNoiseStart + bitNoiseStart + frame1Signal + frame2Signal + bitNoiseEnd
+    out = frame1Signal + frame2Signal
 
     return (out, syncFinishedTime)
 

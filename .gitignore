@@ -98,3 +98,6 @@ testbench/
 
 # python
 *.pyc
+
+# auto generated header file
+wwvb_simulator/signal_out.h
