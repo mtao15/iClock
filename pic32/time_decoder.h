@@ -3,9 +3,9 @@
 
 #include <time.h>
 
-#define NSAMPLES 10
-#define NSPADDING 2
-#define BUFFERSIZE 120
+#define NSAMPLES 10       /* Number of samples per second */
+#define NSPADDING 2       /* Padding for error tolerance */
+#define BUFFERSIZE 120    /* Number of transmitted bits to store */
 
 enum STATE {
     waitForHigh,

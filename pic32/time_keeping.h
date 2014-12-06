@@ -4,8 +4,8 @@
 #include <P32xxxx.h>
 #include <time.h>
 
-#define MS100 62500    /* prescaler of 8  */
-#define MS90 56250     /* prescaler of 32 */
+#define MS100 62500
+#define MS90 56250
 #define NTICKS 10
 
 static inline void startSamplingTimer()
