@@ -33,7 +33,7 @@ char getReceiverOutput()
     char accum = ~PORTF & 0x1;
     resetSamplingTimer();
 
-    /* get a sample every millisecond */
+    /* get 1000 samples in sampling period */
     int intervalCount = MS90 / 1000;
     int count = 1;
 

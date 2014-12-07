@@ -124,7 +124,7 @@ int main()
         int        timePacket = createPacket(timeToSend, packetHeader);
         sendCurrentTime(timePacket);
 
-        /* pause loop until 25 ms has ellapsed */
+        /* pause loop until 100 ms has ellapsed */
         holdTimeKeepingTimer();
         resetTimeKeepingTimer();
     }
