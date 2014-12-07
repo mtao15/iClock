@@ -8,7 +8,7 @@ module spi_receiver (input  logic clk, sclk,     //clk @ 40MHz (0.025us period)
                      output logic header,        // denotes if current time = time 
                                                  // of last sync (if so, header = 1)
                      output logic [4:0] hour,    // 0-23 hours
-                     output logic [5:0] minute, 
+                     output logic [5:0] minute,  // 0-60
                      output logic [5:0] second,  // 0-60
                      output logic [3:0] month,   // 0-12
                      output logic [4:0] day,     // 0-31
