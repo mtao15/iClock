@@ -1,0 +1,251 @@
+\documentclass[11pt]{article}
+%<<< packages
+\usepackage[margin=1.5in]{geometry}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{pdfsync}
+\usepackage{siunitx}
+\usepackage{titlesec}
+\usepackage{titling}
+\usepackage{url}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+
+\makeatletter
+\def\bstctlcite{\@ifnextchar[{\@bstctlcite}{\@bstctlcite[@auxout]}}
+\def\@bstctlcite[#1]#2{\@bsphack
+  \@for\@citeb:=#2\do{%
+    \edef\@citeb{\expandafter\@firstofone\@citeb}%
+    \if@filesw\immediate\write\csname #1\endcsname{\string\citation{\@citeb}}\fi}%
+  \@esphack}
+\makeatother
+
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\bfseries}{\thesubsection}{1em}{}
+\renewcommand{\abstractname}{Summary}
+%>>>
+
+\title{\bf \Large A Digital Clock with \\Automatic Radio Synchronization}
+
+% <<< author block
+\author{
+  Yukun Lin,
+  Mengyi Tao
+}%
+\date{}
+% >>>
+\begin{document}
+\maketitle
+\bstctlcite{IEEEexample:BSTcontrol}
+%
+\vspace{.1cm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Project Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+We would like to build a radio clock using the PIC32 and FPGA. The radio clock will keep
+track of time and date using the onboard \SI{40}{\mega \Hz} system clock and receive time
+synchronization signal from the ground based radio station WWVB. The time synchronization
+radio signal will be demodulated and decoded using the PIC32. The current time and date will
+then be displayed on a VGA monitor.
+
+\subsection{Goals}
+
+The radio clock was designed to have the following features.
+\begin{itemize}
+  \item
+    Error checking to ensure that the synchronization signal is valid.
+  \item
+    Automatically start synchronization at predefined time intervals.
+  \item
+    A button to allow for manual synchronization.
+  \item
+    Draw an analogue clock face with hour, minute, and second hands on the VGA monitor to
+    display the time.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Background}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Radio Clocks}
+A radio clock is a clock that is synchronized using a time code transmitted by a radio
+transmitter connected to a time standard such as an atomic clock. Ground based
+transmission stations transmit UTC (Coordinated Universal Time) time signals with
+\SI{40}{\kilo \Hz} to \SI{100}{\kilo \Hz} carrier waves \cite{wikiradio}.  During the time
+interval between synchronization, local time is usually kept by means of a crystal quartz
+oscillator.
+
+\subsection{Transmission Format}
+For this project, we will be using the time code transmitted over a \SI{60}{\kilo \Hz}
+carrier wave by the WWVB radio station at Fort Collins, Colorado. The time code
+transmitted is from a set of atomic clocks located at the transmitter site. The carrier
+wave is transmitted at \SI{70}{\kilo \watt} and has a range covering the continental
+United States. Binary data is transmitted at 1 bit per second over the carrier wave. The
+encoding of the binary data is done through both amplitude and phase modulation. A message
+of \SI{60}{\second} encodes the current time of day and date, with the start of the
+message indicating the start of a minute.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Methods}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=11cm]{figures/Project_Schematic.png}
+  \caption{Overall schematic}
+  \label{fig:scheme}
+\end{figure}
+
+\noindent The overall schematic of the radio clock is shown in Fig.~\ref{fig:scheme}.
+
+\subsection{Demodulation}
+We will be using an off the shelf antenna and receiver board to receive and demodulate the
+signal. The demodulation will be handled by the receiver board, which will output $V_H$
+when the carrier wave is broadcasting at high power, and $V_L$ when the carrier wave is
+broadcasting at low power. This digital output will be passed to the PIC32 for processing.
+
+\subsection{Decoding}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=11cm]{figures/Project_PIC_Code_Flow_Chart.png}
+  \caption{Overall flow}
+  \label{fig:flow}
+\end{figure}
+Decoding will be handled by the PIC32 and the program flow is shown in
+Fig.~\ref{fig:flow}. A single bit is encoded in 1 seconds of transmission. The start of a
+bit transmission is indicated by a transition from high amplitude to low amplitude signal.
+The encodings are as follows.
+\begin{enumerate}[i.]
+  \item
+    A marker bit is indicated by \SI{0.8}{\second} of low amplitude followed by
+    \SI{0.2}{\second} of high amplitude.
+  \item
+    A ``1'' bit is indicated by \SI{0.5}{\second} of low amplitude followed by
+    \SI{0.5}{\second} of high amplitude.
+  \item
+    A ``0'' bit is indicated by \SI{0.2}{\second} of low amplitude followed by
+    \SI{0.8}{\second} of high amplitude.
+\end{enumerate}
+The start of a time synchronization message is indicated by two consecutive marker bits
+and also indicates the start of a minute. The details of the time code format can be found
+at \cite{wiki}.
+
+\subsection{Error Checking}
+The time synchronization message does not come with a checksum, and will be checked for
+errors manually. The following criterion will be checked:
+\begin{enumerate}[i.]
+  \item
+    The time synchronization message has to encode a plausible time. For example,
+    a message with ``75'' encoded by the minute bits is clearly invalid.
+  \item
+    Within a time synchronization message, the predefined unused bits has to be ``0'', in
+    accordance with the time code format specification.
+  \item
+    The time encoded within two consecutive messages should differ by one minute.
+\end{enumerate}
+
+\subsection{Time Display}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=8cm]{figures/FPGA_Display.png}
+  \caption{Mock up of display}
+  \label{fig:display}
+\end{figure}
+Time display will be handled by the FPGA. A mock up of the display is shown in
+Fig.~\ref{fig:display}. The current time will be sent using SPI from the
+PIC32 to the FPGA. The FPGA will control the image being displayed on the VGA.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Design}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection {Hardware}
+
+\subsubsection {SPI}
+SPI2 on the PIC was chosen for communications between the PIC and the FPGA. The terminals that were used and their corresponding PIC and FPGA pins are listed below.
+
+\begin{center}
+SCLK2 $\rightarrow$  RG6 (P99)\\
+SDO2 $\rightarrow$ RG7 (P75)
+\end{center}
+
+The pins were connected with the appropriate system verilog SPI registers using Quartus pin planner.
+
+\subsubsection {Radio Signal Receiver}
+WWVB radio signals were received and demodulated using a SYM-RFT-60HS WWVB receiver-antenna module from PV Electronics.\cite{receiverdatasheet} This module runs on 3.0- \SI{5.0}{\volt} supply voltage and 3-\SI{10}{\milli \ampere} of supply current. Pinout for the receiver board is shown in %INSERT TABLE 1%
+and a schematic detailing its connection with our $\mu$Mudd board system can be found in %INSERT RECEIVER SCHEMATIC%
+
+	The output from the receiver, which is connected to the RF0 pin on the $\mu$Mudd board, consists of square waves corresponding to all \SI{60}{\kilo \hertz} signals picked up by the ferrite core antenna. 
+    
+\subsection {Software}
+%[Insert overview of PIC code]%
+The vga.sv System Verilog file provided in Lab 7 was used as the base code to set up the VGA. This code was then edited to instantiate an analog clock and digital time display on the VGA monitor. All code governing the behavior of the VGA monitor was written in the edited vga.sv file. A System Verilog submodule was constructed for the SPI receiver.
+
+\subsection {PIC}
+
+\subsubsection {Decoder}
+
+\subsubsection {Error Checker}
+
+\subsection {FPGA}
+
+\subsubsection {VGA Analog Clock Face}
+
+\subsubsection {VGA Analog Clock Hands}
+
+\subsubsection {Digital Time Displays}
+
+\subsubsection{SPI}
+
+SPI Sender (PIC): \\
+In the SPI configuration, PIC was chosen as the master device and FPGA the slave. The baud rate was set to be \SI{1.25}{\mega \hertz} (for \SI{20}{\mega \hertz} peripheral clock) to guarantee a fast enough data update speed for the VGA. The SPI buffer was reset after each message was sent.
+
+To incorporate all the bits necessary to reflect date and time, a 32 bit data width was chosen for the SPI bus.A header bit was placed at the beginning of each message to indicate if the time being transmitted over the SPI is also the latest time at which the clock performed a successful synch with the radio time signals. %INSERT THE FIGURE FOR SPI MESSAGE%
+shows the placement of time messages within the 32-bit SPI array. The letter "H" in the figure indicates the header bit.\\  
+\\
+SPI Receiver (FPGA):\\
+The SPI receiver module on the FPGA read in data being transmitted from PIC’s SDO2 (FPGA’s SDI) pin by shifting out the most significant bit (i.e. bit 31) into a 32-bit shift register over the course of 32 clock cycles. After that, it parses out the header and date and time bits from sections of the 32 bit message corresponding to header, month, day, year, hour, minute, and second. To prevent the SPI receiver from reading the PIC SPI buffer before data was ready to be sent, a module was added to reset the FPGA SPI receiver's shift register if sclk remained low for more than \SI{0.2}{\micro \second}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Testing}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%[INSERT INFO ON EMULATOR & PYTHON TEST SCRIPT]%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results and Discussion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%[INSERT IMAGES/FIGURES OF WORKING SYSTEM]%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion and Recommendations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-Move to Colorado.\\
+-Low pass filter on hardware\\
+-Second correction by examining where square waves start/end (correcting drift)\\
+-Special clock oscillators for higher accuracy\\
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Logistics}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The following matrials will be needed to accomplish the goals of this project.
+\begin{itemize}
+  \item Radio antenna
+  \item Radio receiver (components or off the shelf)
+  \item VGA monitor
+  \item $\mu$Mudd board
+\end{itemize}
+The radio antenna and receiver have been purchased for \$50 (including shipping). The rest
+of the components can be found in the lab.
+
+
+\nocite{*}
+%\bibliographystyle{ieeetran}
+%\bibliography{citations}
+\end{document}
